@@ -89,6 +89,13 @@ class MpesaCallbackView(APIView):
 
         if result_code == 0:
             metadata = {item["Name"]: item.get("Value") for item in body.get("CallbackMetadata", {}).get("Item", [])}
+            callback_amount = metadata.get("Amount")
+            if callback_amount is None or str(callback_amount) != str(int(txn.amount_kes)):
+                txn.status = MpesaTransaction.Status.FAILED
+                txn.result_desc = "Callback amount did not match the expected booking amount."
+                txn.save(update_fields=["status", "result_code", "result_desc", "raw_callback", "updated_at"])
+                return Response({"ResultCode": 0, "ResultDesc": "Accepted"}, status=200)
+
             txn.status = MpesaTransaction.Status.SUCCESS
             txn.mpesa_receipt_number = metadata.get("MpesaReceiptNumber", "")
             txn.save()
