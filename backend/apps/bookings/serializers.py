@@ -69,6 +69,10 @@ class ServiceRequestDecisionSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     "agreed_price_kes and scheduled_date are required to accept a request."
                 )
+            if attrs["agreed_price_kes"] <= 0:
+                raise serializers.ValidationError({"agreed_price_kes": "Price must be greater than zero."})
+            if attrs["scheduled_date"] < timezone.localdate():
+                raise serializers.ValidationError({"scheduled_date": "Scheduled date cannot be in the past."})
         return attrs
 
 

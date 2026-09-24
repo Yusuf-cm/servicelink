@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -66,8 +67,18 @@ class ServiceRequestDecisionView(APIView):
 
     permission_classes = [permissions.IsAuthenticated, IsProvider]
 
+    @transaction.atomic
     def post(self, request, pk):
-        service_request = get_object_or_404(ServiceRequest, pk=pk, provider__user=request.user)
+        # Lock the request so two near-simultaneous accepts cannot create
+        # conflicting booking state.
+        service_request = (
+            ServiceRequest.objects.select_for_update()
+            .select_related("provider__user", "client")
+            .filter(pk=pk, provider__user=request.user)
+            .first()
+        )
+        if not service_request:
+            return Response({"detail": "Service request not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if service_request.status != ServiceRequest.Status.PENDING:
             return Response(
